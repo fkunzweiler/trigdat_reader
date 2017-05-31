@@ -20,6 +20,8 @@ from gbm_drm_gen.drmgen_trig import DRMGenTrig
 
 from balrog_like import BALROGLike
 
+lu = ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'na', 'nb', 'b0', 'b1']
+
 class TrigReader(object):
     """
     This class reads a GBM trigdat file and performs background fitting, source selection, and plotting.
@@ -190,7 +192,7 @@ class TrigReader(object):
             # for now just keep the normal exposure
 
             # we will create binned spectra for each time slice
-
+            print i
             drm_gen = DRMGenTrig(
                 self._qauts,
                 self._sc_pos,
