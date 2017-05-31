@@ -192,7 +192,7 @@ class TrigReader(object):
             # for now just keep the normal exposure
 
             # we will create binned spectra for each time slice
-            print i
+            
             drm_gen = DRMGenTrig(
                 self._qauts,
                 self._sc_pos,
