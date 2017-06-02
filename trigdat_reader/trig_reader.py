@@ -1,6 +1,6 @@
 import numpy as np
 
-from threeML import TimeSeriesBuilder
+import collections
 
 from threeML.plugins.spectrum.binned_spectrum import BinnedSpectrumWithDispersion
 from threeML.utils.time_series.binned_spectrum_series import BinnedSpectrumSeries
@@ -10,17 +10,17 @@ from threeML.plugins.DispersionSpectrumLike import DispersionSpectrumLike
 
 from threeML.utils.time_interval import TimeIntervalSet
 
-import collections
-
 import astropy.io.fits as fits
 
 from gbm_drm_gen.balrog_drm import BALROG_DRM
 from gbm_drm_gen.drmgen_trig import DRMGenTrig
 
-
 from balrog_like import BALROGLike
 
-lu = ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'na', 'nb', 'b0', 'b1']
+# This is a holder of the detector names
+
+lu = ('n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'na', 'nb', 'b0', 'b1')
+
 
 class TrigReader(object):
     """
@@ -30,10 +30,12 @@ class TrigReader(object):
     :param fine: optional argument to use trigdat fine resolution data. Defaults to False
     """
 
-    def __init__(self, trigdat_file, fine=False, time_resolved=False):
+    def __init__(self, trigdat_file, fine=False, time_resolved=False, verbose=True):
 
-        #self._backgroundexists = False
-        #self._sourceexists = False
+        # self._backgroundexists = False
+        # self._sourceexists = False
+
+        self._verbose = verbose
         self._time_resolved = time_resolved
         # Read the trig data file and get the appropriate info
 
@@ -177,41 +179,49 @@ class TrigReader(object):
         self._time_intervals = TimeIntervalSet.from_starts_and_stops(
             self._tstart, self._tstop)
 
-        #self._pos_interp = PositionInterpolator(trigdat=trigdat_file)
+        # self._pos_interp = PositionInterpolator(trigdat=trigdat_file)
 
         self._create_timeseries()
 
     def _create_timeseries(self):
+        """
+        create all the time series for each detector
+        :return: None
+        """
 
         self._time_series = collections.OrderedDict()
 
-        for i in range(14):
+        for det_num in range(14):
 
             # detectors are arranged [time,det,channel]
 
             # for now just keep the normal exposure
 
             # we will create binned spectra for each time slice
-            
+
+
             drm_gen = DRMGenTrig(
                 self._qauts,
                 self._sc_pos,
-                i,
+                det_num,  # det number
                 tstart=self._tstart,
                 tstop=self._tstop,
                 mat_type=2,
                 time=0)
 
+            # we will use a single response for each detector
+
             tmp_drm = BALROG_DRM(drm_gen, 0, 0)
 
-            counts = self._rates[:,
-                                 i, :] * self._time_intervals.widths.reshape(
-                                     (len(self._time_intervals), 1))
+            # extract the counts
+
+            counts = self._rates[:, det_num, :] * self._time_intervals.widths.reshape((len(self._time_intervals), 1))
+
+            # now create a binned spectrum for each interval
 
             binned_spectrum_list = []
 
             for c, start, stop in zip(counts, self._tstart, self._tstop):
-
                 binned_spectrum_list.append(
                     BinnedSpectrumWithDispersion(
                         counts=c,
@@ -220,41 +230,78 @@ class TrigReader(object):
                         tstart=start,
                         tstop=stop))
 
+            # make a binned spectrum set
+
             bss = BinnedSpectrumSet(
                 binned_spectrum_list,
                 reference_time=0.,
                 time_intervals=self._time_intervals)
 
+            # convert that set to a series
+
             bss2 = BinnedSpectrumSeries(bss, first_channel=0)
 
-            name = lu[i]
+            # now we need to get the name of the detector
 
-            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm)
+            name = lu[det_num]
+
+            # create a time series builder which can produce plugins
+
+            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm, verbose=self._verbose)
+
+            # attach that to the full list
 
             self._time_series[name] = tsb
 
     def view_lightcurve(self, start=-30, stop=30):
+        """
+        view the lightcurves of all detectors
+
+        :param start: start time
+        :param stop: stop time
+        :return:
+        """
 
         for name, det in self._time_series.iteritems():
-
             fig = det.view_lightcurve(start, stop)
             fig.get_axes()[0].set_title(name)
 
     def set_background_selections(self, *intervals):
+        """
+        set the background selections for all detection
+
+        :param intervals: str of intervals
+        :return:
+        """
         for name, det in self._time_series.iteritems():
             det.set_background_interval(*intervals, unbinned=False)
 
     def set_active_time_interval(self, *intervals):
+        """
+        set the selection for all intervals
+        :param intervals:
+        :return:
+        """
         for name, det in self._time_series.iteritems():
             det.set_active_time_interval(*intervals)
 
     def to_plugin(self, *detectors):
+        """
+
+        convert the series to a BALROGLike plugin
+
+        :param detectors: detectors to use
+        :return:
+        """
 
         data = []
 
         for det in detectors:
+            # first create a DSL
 
             speclike = self._time_series[det].to_spectrumlike()
+
+            # then we convert to BL
 
             time = 0.5 * (
                 self._time_series[det].tstart + self._time_series[det].tstop)
