@@ -62,6 +62,19 @@ class BALROGLike(DispersionSpectrumLike):
                     key].position.dec.prior = Cosine_Prior(
                     lower_bound=-90., upper_bound=90)
 
+
+                ra = self._like_model.point_sources[key].position.ra.value
+                dec = self._like_model.point_sources[key].position.dec.value
+
+        
+
+            
+            self._rsp.set_location(ra, dec)
+
+
+
+                
+
     def get_model(self):
 
         # Here we update the GBM drm parameters which creates and new DRM for that location
@@ -75,7 +88,7 @@ class BALROGLike(DispersionSpectrumLike):
 
         # update the location
 
-        if not self._free_position:
+        if self._free_position:
             self._rsp.set_location(ra, dec)
 
         return super(BALROGLike, self).get_model()
