@@ -6,6 +6,8 @@ import healpy as hp
 
 import astropy.units as u
 
+import collections
+
 
 class ThetaFormatterShiftPi(GeoAxes.ThetaFormatter):
     """Shifts labelling by pi
@@ -26,8 +28,6 @@ class ThetaFormatterShiftPi(GeoAxes.ThetaFormatter):
         if x < 0:
             x += 2*np.pi
         return GeoAxes.ThetaFormatter.__call__(self, x, pos)
-
-
 
 
 def check_power_of_two(num):
@@ -86,6 +86,8 @@ class Palantir(object):
         ra = result.samples[0, :]
         dec = result.samples[1, :]
 
+        self._result = result
+
         for r, d in zip(ra, dec):
             self._map[sky_to_pix(r, d, nside)] += 1
 
@@ -104,6 +106,15 @@ class Palantir(object):
         else:
 
             self._position_interpolator = None
+
+        self._extra_maps = collections.OrderedDict()
+
+
+    def add_healpix_map(self,healpix_map,name):
+
+
+        self._extra_maps[name] = healpix_map
+
 
     def skymap(self, *dets, **kwargs):
 
@@ -147,7 +158,7 @@ class Palantir(object):
 
         # rasterized makes the map bitmap while the labels remain vectorial
         # flip longitude to the astro convention
-        image = ax.pcolormesh(longitude[::-1],
+        image = ax.pcolormesh(longitude,#[::-1],
                               latitude,
                               grid_map,
                               vmin=vmin,
@@ -157,29 +168,26 @@ class Palantir(object):
 
 
 
-        # graticule
-        lon_g = ax.set_longitude_grid(60)
-        ax.xaxis.set_major_formatter(ThetaFormatterShiftPi(60, extrapi=False))
 
-        width = _det_kwargs['width']
-
-        if width < 10:
-            lat_g = ax.set_latitude_grid(45)
-            lon_g = ax.set_longitude_grid_ends(90)
-
-        for g in ax.xaxis.get_gridlines() + ax.yaxis.get_gridlines():
-            g.set_linestyle("dotted")
-            g.set_color("black")
-            g.set_alpha(0.5)
 
         for det in dets:
+
+
             ra, dec = self._get_detector_map(det, _det_kwargs['fov'])
 
             # pix = np.where(detector_map == 1)[0]
             # ra, dec = pix_to_sky(pix,self._nside)
 
+            
+            # need to shift the ra because.... dumb
 
-            x = np.radians(ra - 180)
+            idx =ra >180.
+
+            ra[idx] -=360.
+
+
+
+            x = np.radians(ra)
             y = np.radians(dec)
 
             idx = y.argsort()
@@ -189,7 +197,18 @@ class Palantir(object):
         if _det_kwargs['show_earth']:
             earth_points = self._gbm.get_earth_points(False)
 
-            ax.plot(np.radians(earth_points.ra.value - 180),
+
+            ra = earth_points.ra.value
+
+            # need to shift the ra because.... dumb
+
+            idx = ra > 180.
+
+            ra[idx] -= 360.
+
+
+
+            ax.plot(np.radians(ra),
                     earth_points.dec.radian,
                     '.',
                     color='k',
@@ -197,6 +216,33 @@ class Palantir(object):
                     zorder=-31)
 
         unit = r'$p$'
+
+
+        for name, extra_map in self._extra_maps.iteritems():
+
+            contour_worker = ContourFinder(extra_map,self._nside)
+
+
+
+
+            for level in [.68,.95]:
+
+                contour_idx = contour_worker.find_contour(containment_level=level)
+
+                ra, dec = contour_worker.get_sky_coordinates(contour_idx)
+
+                x = np.radians(ra - 180)
+                y = np.radians(dec)
+
+                idx = y.argsort()
+
+                ax.plot(x[idx], y[idx], '.', markersize=3)
+
+
+
+            #plt.contour(longitude[::-1], latitude, region, colors='jet', levels=levels)
+
+
 
         # colorbar
         if _det_kwargs['colorbar']:
@@ -211,6 +257,27 @@ class Palantir(object):
             # workaround for issue with viewers, see colorbar docstring
             cb.solids.set_edgecolor("face")
 
+
+
+            # graticule
+
+        shift = 0.
+
+        lon_g = ax.set_longitude_grid(60.)
+
+        ax.xaxis.set_major_formatter(ThetaFormatterShiftPi(60., extrapi=False))
+
+        width = _det_kwargs['width']
+
+        if width < 10:
+            lat_g = ax.set_latitude_grid(45)
+            lon_g = ax.set_longitude_grid_ends(90)
+
+        for g in ax.xaxis.get_gridlines() + ax.yaxis.get_gridlines():
+            g.set_linestyle("dotted")
+            g.set_color("black")
+            g.set_alpha(0.5)
+
         ax.tick_params(axis='x', labelsize=10)
         ax.tick_params(axis='y', labelsize=10, color='k')
         ax.grid(True)
@@ -219,12 +286,101 @@ class Palantir(object):
 
     def _get_detector_map(self, det,fov):
 
-        det_map = np.arange(hp.nside2npix(self._nside), dtype=float)
-        det_map[:] = 0.
+        #det_map = np.arange(hp.nside2npix(self._nside), dtype=float)
+        #det_map[:] = 0.
 
         cir = self._gbm.detectors[det].get_fov(fov)
         ra = cir[0]
         dec = cir[1]
+
+        return ra, dec
+
+
+    def get_flux_upper_bound(self,ene_min,ene_max, percentile=95.):
+
+        flux = self._result.get_point_source_flux(ene_min,
+                                                  ene_max,
+                                                  get_distribution=True)
+
+        # now get the flux argument
+
+        ub = np.percentile(flux['distribution'][0],percentile)
+
+        return ub * u.Unit('erg/(cm2 s)')
+
+
+
+
+class ContourFinder(object):
+    def __init__(self, healpix_map, nside=128):
+        """
+        modeled from giacomov
+
+
+        """
+
+        self._nside = nside
+
+        if not check_power_of_two(self._nside):
+            raise RuntimeError("nside must be a power of 2.")
+
+        #hpx_orig, header = hp.read_map(healpix_map, h=True, verbose=False)
+
+        # Use power=-2 so the sum is still 1
+
+        self._map = hp.pixelfunc.ud_grade(healpix_map, nside_out=self._nside, power=-2)
+
+        # Check that the total probability is still equal to the input map
+
+        assert abs(np.sum(healpix_map) - np.sum(self._map)) < 1e-3, "Total probability after resize has not been kept!"
+
+    @property
+    def map(self):
+        """Return the resized map"""
+
+        return self._map
+
+    @property
+    def nside(self):
+        """Return the nside of the re-sized map"""
+        return self._nside
+
+    @property
+    def pixel_size(self):
+        """Return average side of pixel in degrees for the re-sized map"""
+
+        # Formula from the manual of the function HEALPIXWINDOW
+
+        arcmin_to_degree = 1.0 / 60.0
+
+        return np.sqrt(3.0 / np.pi) * 3600.0 / self._nside * arcmin_to_degree
+
+    def find_contour(self, containment_level=0.9):
+        """Return the *indexes* of the pixels in the map within the given containment level"""
+
+        # Get indexes sorting the array in decreasing order
+
+        index_revsort = np.argsort(self._map)[::-1]
+
+        # Compute the cumulative sum of the probabilities in the ordered "space"
+
+        cumsum = np.cumsum(self._map[index_revsort])
+
+        # Find out which pixels are within the containment level requested in the ordered "space"
+
+        idx_prime = (cumsum <= containment_level)
+
+        # Convert back to the "unordered space"
+
+        idx = index_revsort[idx_prime]
+
+        assert abs(np.sum(self._map[
+                              idx]) - containment_level) < 1e-2, "Total prob. within containment is too far from requested value"
+
+        return idx
+
+    def get_sky_coordinates(self, indexes):
+        ra, dec = pix_to_sky(indexes, self.nside)
 
         return ra, dec
 
