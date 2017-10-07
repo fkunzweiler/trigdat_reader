@@ -13,9 +13,10 @@ from threeML.utils.time_interval import TimeIntervalSet
 import astropy.io.fits as fits
 
 from gbm_drm_gen.balrog_drm import BALROG_DRM
+from gbm_drm_gen.balrog_like import BALROGLike
 from gbm_drm_gen.drmgen_trig import DRMGenTrig
 
-from balrog_like import BALROGLike
+
 
 # This is a holder of the detector names
 
