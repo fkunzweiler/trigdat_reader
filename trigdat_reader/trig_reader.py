@@ -2,9 +2,9 @@ import numpy as np
 
 import collections
 
-from threeML.plugins.spectrum.binned_spectrum import BinnedSpectrumWithDispersion
+from threeML.utils.spectrum.binned_spectrum import BinnedSpectrumWithDispersion
 from threeML.utils.time_series.binned_spectrum_series import BinnedSpectrumSeries
-from threeML.plugins.spectrum.binned_spectrum_set import BinnedSpectrumSet
+from threeML.utils.spectrum.binned_spectrum_set import BinnedSpectrumSet
 from threeML.utils.data_builders.time_series_builder import TimeSeriesBuilder
 from threeML.plugins.DispersionSpectrumLike import DispersionSpectrumLike
 
@@ -12,8 +12,8 @@ from threeML.utils.time_interval import TimeIntervalSet
 
 import astropy.io.fits as fits
 
-from gbm_drm_gen.balrog_drm import BALROG_DRM
-from gbm_drm_gen.balrog_like import BALROGLike
+from gbm_drm_gen.io.balrog_drm import BALROG_DRM
+from gbm_drm_gen.io.balrog_like import BALROGLike
 from gbm_drm_gen.drmgen_trig import DRMGenTrig
 
 
