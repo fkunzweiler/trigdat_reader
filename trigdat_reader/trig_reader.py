@@ -314,3 +314,73 @@ class TrigReader(object):
             data.append(balrog_like)
 
         return data
+
+    def counts_and_background(self, time_series_builder):
+        """                                                                                                                                                                                                                                                                    
+        Method that returns the observed rate and the rate of the poly bkg fit                                                                                                                                                                                                 
+        :return: returns the observed rate and bkg rate for one detector for all time_bins                                                                                                                                                                                     
+        """
+        start=-1000
+        stop=1000
+        time_series = time_series_builder.time_series
+        poly_fit_exists = time_series.poly_fit_exists
+        binned_spectrum_set = time_series.binned_spectrum_set
+        counts=[]
+        width=[]
+        bins = binned_spectrum_set.time_intervals.containing_interval(start, stop)
+        for bin in bins:
+            counts.append(time_series.counts_over_interval(bin.start_time, bin.stop_time) )
+            width.append(bin.duration)
+        counts = np.array(counts)
+        width = np.array(width)
+        rates_observed = counts/width
+
+        if poly_fit_exists:
+            polynomials = time_series.polynomials
+
+            bkg = []
+            for j, tb in enumerate(bins):
+                tmpbkg = 0.
+                for poly in polynomials:
+                    tmpbkg += poly.integral(tb.start_time, tb.stop_time)
+
+                bkg.append(tmpbkg / width[j])
+
+        else:
+
+            bkg = None
+
+        rates_observed = np.array(rates_observed)
+        bkg = np.array(bkg)
+        return rates_observed, bkg
+
+    def observed_and_background(self):
+        """                                                                                                                                                                                                                                                                    
+        Method that returns the observed rate and the rate calculated with the bkg fit. Needs the method counts_and_background in 3ML.                                                                                                                                         
+        Needed for the automatic localisation script to identify the active time and bkg times.                                                                                                                                                                                
+        :return: returns an list with an array in which the observed rate for all time_bins is saved for every det, same for bkg fit                                                                                                                                           
+        """
+        observed_rate_all = []
+        background_rate_all = []
+        for name, det in self._time_series.iteritems():
+            observed_rate, bkg_rate = self.counts_and_background(det)
+            observed_rate_all.append(observed_rate)
+            background_rate_all.append(bkg_rate)
+
+        return observed_rate_all, background_rate_all
+
+    def tstart_tstop(self):
+        """                                                                                                                                                                                                                                                                    
+        :return: start and stops time of bins in trigdata                                                                                                                                                                                                                      
+        """
+        return self._tstart,self._tstop
+
+    def quats_sc_time_burst(self):
+        """                                                                                                                                                                                                                                                                    
+        :return: returns the quat, the sc pos and the time of the trigger                                                                                                                                                                                                      
+        """
+        i=0
+        while i<len(self._qauts):
+            if self._tstart[i]>0:
+                return self._qauts[i], self._sc_pos[i], self._trigtime
+            i+=1
