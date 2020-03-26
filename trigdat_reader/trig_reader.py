@@ -39,6 +39,7 @@ class TrigReader(object):
 
         self._verbose = verbose
         self._time_resolved = time_resolved
+        self._poly_order = poly_order
         # Read the trig data file and get the appropriate info
 
         trigdat = fits.open(trigdat_file)
@@ -183,9 +184,9 @@ class TrigReader(object):
 
         # self._pos_interp = PositionInterpolator(trigdat=trigdat_file)
 
-        self._create_timeseries(poly_order=poly_order)
+        self._create_timeseries()
 
-    def _create_timeseries(self, poly_order=-1):
+    def _create_timeseries(self):
         """
         create all the time series for each detector
         :return: None
@@ -249,7 +250,7 @@ class TrigReader(object):
 
             # create a time series builder which can produce plugins
 
-            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm, verbose=self._verbose, poly_order=poly_order)
+            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm, verbose=self._verbose, poly_order=self._poly_order)
 
             # attach that to the full list
 
