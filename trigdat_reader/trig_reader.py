@@ -29,6 +29,7 @@ class TrigReader(object):
     It is also fed to the Balrog when performing localization with trigdat data.
     :param triddat_file: string that is the path to the trigdat file you wish ot read
     :param fine: optional argument to use trigdat fine resolution data. Defaults to False
+    :poly_order: optional argument to set the order of the polynomial used in the background fit.
     """
 
     def __init__(self, trigdat_file, fine=False, time_resolved=False, verbose=True, poly_order=-1):
