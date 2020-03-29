@@ -29,15 +29,17 @@ class TrigReader(object):
     It is also fed to the Balrog when performing localization with trigdat data.
     :param triddat_file: string that is the path to the trigdat file you wish ot read
     :param fine: optional argument to use trigdat fine resolution data. Defaults to False
+    :poly_order: optional argument to set the order of the polynomial used in the background fit.
     """
 
-    def __init__(self, trigdat_file, fine=False, time_resolved=False, verbose=True):
+    def __init__(self, trigdat_file, fine=False, time_resolved=False, verbose=True, poly_order=-1):
 
         # self._backgroundexists = False
         # self._sourceexists = False
 
         self._verbose = verbose
         self._time_resolved = time_resolved
+        self._poly_order = poly_order
         # Read the trig data file and get the appropriate info
 
         trigdat = fits.open(trigdat_file)
@@ -248,7 +250,7 @@ class TrigReader(object):
 
             # create a time series builder which can produce plugins
 
-            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm, verbose=self._verbose)
+            tsb = TimeSeriesBuilder(name, bss2, response=tmp_drm, verbose=self._verbose, poly_order=self._poly_order)
 
             # attach that to the full list
 
