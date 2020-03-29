@@ -264,7 +264,7 @@ class TrigReader(object):
         :return:                                                                                                                                                                                                                                                               
         """
         plots = []
-        for name, det in self._time_series.iteritems():
+        for name, det in self._time_series.items():
 
             #try because sometimes there is no data for some dets in the trigdat files                                                                                                                                                                                         
 
@@ -287,7 +287,7 @@ class TrigReader(object):
         :param intervals: str of intervals
         :return:
         """
-        for name, det in self._time_series.iteritems():
+        for name, det in self._time_series.items():
             det.set_background_interval(*intervals, unbinned=False)
 
     def set_active_time_interval(self, *intervals):
@@ -296,7 +296,7 @@ class TrigReader(object):
         :param intervals:
         :return:
         """
-        for name, det in self._time_series.iteritems():
+        for name, det in self._time_series.items():
             det.set_active_time_interval(*intervals)
 
     def to_plugin(self, *detectors):
@@ -375,7 +375,7 @@ class TrigReader(object):
         """
         observed_rate_all = []
         background_rate_all = []
-        for name, det in self._time_series.iteritems():
+        for name, det in self._time_series.items():
             observed_rate, bkg_rate = self.counts_and_background(det)
             observed_rate_all.append(observed_rate)
             background_rate_all.append(bkg_rate)
